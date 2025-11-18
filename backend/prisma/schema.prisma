@@ -1,0 +1,282 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PurchaseSource {
+  EBAY
+  GOODWILL
+  SALVATION_ARMY
+  FACEBOOK_MARKETPLACE
+  OFFERUP
+  OTHER
+}
+
+enum ListingPlatform {
+  EBAY
+  FACEBOOK_MARKETPLACE
+  OFFERUP
+  POSHMARK
+  MERCARI
+  SHOPGOODWILL
+  OTHER
+}
+
+enum ListingStatus {
+  DRAFT
+  ACTIVE
+  PENDING
+  SOLD
+  ARCHIVED
+}
+
+enum Condition {
+  NEW
+  LIKE_NEW
+  GOOD
+  FAIR
+  POOR
+  UNKNOWN
+}
+
+enum InventoryStatus {
+  INBOUND
+  IN_STOCK
+  LISTED
+  RESERVED
+  SOLD
+  DONATED
+}
+
+enum ExpenseCategory {
+  SHIPPING
+  SUPPLIES
+  STORAGE
+  FEES
+  MARKETING
+  OTHER
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  displayName   String
+  roles         String[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  apiTokens     IntegrationAccount[]
+  platformCredentials PlatformCredential[]
+}
+
+model Supplier {
+  id             String          @id @default(cuid())
+  name           String
+  source         PurchaseSource
+  externalId     String?         @unique
+  contactDetails Json?
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  purchases      Purchase[]
+}
+
+model Purchase {
+  id              String          @id @default(cuid())
+  orderNumber     String?
+  source          PurchaseSource
+  purchaseDate    DateTime
+  totalCost       Decimal         @db.Decimal(12, 2)
+  shippingCost    Decimal?        @db.Decimal(12, 2)
+  fees            Decimal?        @db.Decimal(12, 2)
+  status          InventoryStatus
+  notes           String?
+  metadata        Json?
+  supplierId      String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  supplier        Supplier?       @relation(fields: [supplierId], references: [id])
+  items           PurchaseItem[]
+
+  @@index([orderNumber])
+  @@index([purchaseDate])
+}
+
+model PurchaseItem {
+  id              String          @id @default(cuid())
+  title           String
+  description     String?
+  quantity        Int             @default(1)
+  unitCost        Decimal         @db.Decimal(12, 2)
+  inventoryStatus InventoryStatus @default(IN_STOCK)
+  sku             String?         @unique
+  location        String?
+  purchaseId      String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  attributes      Json?
+  purchase        Purchase        @relation(fields: [purchaseId], references: [id])
+  listings        Listing[]
+  media           MediaAsset[]
+
+  @@index([title])
+}
+
+model Listing {
+  id              String          @id @default(cuid())
+  platform        ListingPlatform
+  accountId       String?
+  title           String
+  description     String?
+  askingPrice     Decimal         @db.Decimal(12, 2)
+  feesEstimate    Decimal?        @db.Decimal(12, 2)
+  shippingProfile Json?
+  status          ListingStatus   @default(DRAFT)
+  listedAt        DateTime?
+  expiresAt       DateTime?
+  quantity        Int             @default(1)
+  purchaseItemId  String?
+  metadata        Json?
+  condition       Condition       @default(UNKNOWN)
+  category        String?
+  tags            String[]
+  platformSettings Json?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  purchaseItem    PurchaseItem?   @relation(fields: [purchaseItemId], references: [id])
+  sales           Sale[]
+  media           MediaAsset[]
+}
+
+model Sale {
+  id              String        @id @default(cuid())
+  listingId       String?
+  saleDate        DateTime
+  soldPrice       Decimal       @db.Decimal(12, 2)
+  fees            Decimal?      @db.Decimal(12, 2)
+  shippingCost    Decimal?      @db.Decimal(12, 2)
+  buyerDetails    Json?
+  fulfillmentData Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  listing         Listing?      @relation(fields: [listingId], references: [id])
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  category    ExpenseCategory
+  amount      Decimal         @db.Decimal(12, 2)
+  description String?
+  occurredAt  DateTime
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model MediaAsset {
+  id             String        @id @default(cuid())
+  url            String
+  mimeType       String
+  metadata       Json?
+  sortOrder      Int           @default(0)
+  purchaseItemId String?
+  listingId      String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  purchaseItem   PurchaseItem? @relation(fields: [purchaseItemId], references: [id])
+  listing        Listing?      @relation(fields: [listingId], references: [id])
+}
+
+model IntegrationAccount {
+  id          String    @id @default(cuid())
+  provider    String
+  accountName String
+  credentials Json
+  userId      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User?     @relation(fields: [userId], references: [id])
+}
+
+model ListingTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  vertical    String
+  defaultData Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PlatformCredential {
+  id           String          @id @default(cuid())
+  platform     ListingPlatform
+  accountName  String
+  encryptedKey String
+  ownerId      String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  owner        User?           @relation(fields: [ownerId], references: [id])
+}
+
+model GoodwillCredential {
+  id                 String   @id @default(cuid())
+  username           String
+  passwordEncrypted  String
+  autoSyncEnabled    Boolean  @default(true)
+  lastSyncedAt       DateTime?
+  lastSyncAttemptAt  DateTime?
+  lastSyncStatus     String?
+  lastSyncMessage    String?
+  lastImportedCount  Int?     @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model GoodwillSyncLog {
+  id            String   @id @default(cuid())
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+  status        String
+  message       String?
+  importedCount Int      @default(0)
+  source        String   @default("ShopGoodwill")
+}
+
+model SalvationArmyCredential {
+  id                 String   @id @default(cuid())
+  username           String
+  passwordEncrypted  String
+  autoSyncEnabled    Boolean  @default(true)
+  lastSyncedAt       DateTime?
+  lastSyncAttemptAt  DateTime?
+  lastSyncStatus     String?
+  lastSyncMessage    String?
+  lastImportedCount  Int?     @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model SalvationArmyDocument {
+  id           String   @id @default(cuid())
+  invoiceId    String
+  listingId    String?
+  documentType String
+  filePath     String
+  createdAt    DateTime @default(now())
+  metadata     Json?
+}
+
+model SalvationArmySyncLog {
+  id            String   @id @default(cuid())
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+  status        String
+  message       String?
+  importedCount Int      @default(0)
+  source        String   @default("Salvation Army-Online")
+}
