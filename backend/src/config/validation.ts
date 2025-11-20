@@ -58,6 +58,9 @@ export const validationSchema = Joi.object({
   SALVATION_ARMY_LISTING_BASE_URL: Joi.string()
     .uri()
     .default('https://www.shopthesalvationarmy.com'),
+  SALVATION_ARMY_STORAGE_PATH: Joi.string().default('./data/salvation-army'),
+  SALVATION_ARMY_SYNC_ENABLED: Joi.string().valid('true', 'false').optional(),
+  SALVATION_ARMY_SYNC_CRON: Joi.string().optional(),
   FRONTEND_URL: Joi.string().uri().default('http://localhost:5173'),
   EBAY_ENVIRONMENT: Joi.string()
     .valid('Sandbox', 'Production')

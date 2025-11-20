@@ -71,6 +71,14 @@ export const configuration = () => ({
       listingBaseUrl:
         process.env.SALVATION_ARMY_LISTING_BASE_URL ??
         'https://www.shopthesalvationarmy.com',
+      storagePath:
+        process.env.SALVATION_ARMY_STORAGE_PATH ?? './data/salvation-army',
+      sync: {
+        enabled:
+          (process.env.SALVATION_ARMY_SYNC_ENABLED ?? 'true').toLowerCase() !==
+          'false',
+        cron: process.env.SALVATION_ARMY_SYNC_CRON ?? '30 6 * * *',
+      },
     },
   },
   media: {

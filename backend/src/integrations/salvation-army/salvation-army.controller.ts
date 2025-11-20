@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SalvationArmyService } from './salvation-army.service';
 import { SalvationInvoiceDto } from './dto/salvation-invoice.dto';
@@ -7,6 +7,8 @@ import {
   UpdateSalvationArmyCredentialDto,
   SalvationArmyCredentialResponseDto,
 } from './dto/credential.dto';
+import { SalvationArmySyncService } from './salvation-army-sync.service';
+import { PrismaService } from '../../common/prisma/prisma.service';
 
 @ApiTags('Integrations / Salvation Army')
 @Controller('integrations/salvation-army')
@@ -14,6 +16,8 @@ export class SalvationArmyController {
   constructor(
     private readonly salvationArmyService: SalvationArmyService,
     private readonly credentialService: SalvationArmyCredentialService,
+    private readonly syncService: SalvationArmySyncService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post('invoices')
@@ -29,5 +33,20 @@ export class SalvationArmyController {
   @Post('credential')
   upsertCredential(@Body() dto: UpdateSalvationArmyCredentialDto) {
     return this.credentialService.upsert(dto);
+  }
+
+  @Post('sync')
+  triggerSync() {
+    return this.syncService.sync();
+  }
+
+  @Get('sync/logs')
+  listSyncLogs(@Query('limit') limit?: string) {
+    const parsed = limit ? Number(limit) : undefined;
+    const bounded = parsed && parsed > 0 ? Math.min(parsed, 100) : 20;
+    return this.prisma.salvationArmySyncLog.findMany({
+      orderBy: { startedAt: 'desc' },
+      take: bounded,
+    });
   }
 }

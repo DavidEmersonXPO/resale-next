@@ -10,8 +10,6 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { SalvationInvoiceDto } from './dto/salvation-invoice.dto';
 import { SalvationArmyCredentialService } from './salvation-army-credential.service';
 import { SalvationArmyHttpService } from './salvation-army-http.service';
-import { promises as fs } from 'fs';
-import { join } from 'path';
 
 @Injectable()
 export class SalvationArmyService {

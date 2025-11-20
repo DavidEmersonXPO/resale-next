@@ -78,6 +78,9 @@ MEDIA_STORAGE_PATH=./storage/media
 GOODWILL_REQUEST_MAX_RETRIES=3
 GOODWILL_SYNC_ENABLED=true
 GOODWILL_SYNC_CRON=0 6 * * *
+SALVATION_ARMY_STORAGE_PATH=./data/salvation-army
+SALVATION_ARMY_SYNC_ENABLED=true
+SALVATION_ARMY_SYNC_CRON=30 6 * * *
 REDIS_URL=redis://localhost:6379
 ```
 
@@ -176,3 +179,8 @@ The backend exposes `/api/ebay/auth/url`, `/api/ebay/oauth/callback`, `/api/ebay
 - Remote CSV logins now fail fast with descriptive errors and retries. Configure retry count with `GOODWILL_REQUEST_MAX_RETRIES` (default 3).
 - Automatic daily sync is handled by a Cron job (default `0 6 * * *`). Disable or change the cadence using `GOODWILL_SYNC_ENABLED=false` or `GOODWILL_SYNC_CRON=<cron>`.
 - Sync outcomes update the Goodwill credential status and are logged in `goodwillSyncLog`, making it easier to alert on repeated failures.
+
+## Salvation Army Integration
+- Remote invoice fetches run through `POST /integrations/salvation-army/sync` (also scheduled daily via `SALVATION_ARMY_SYNC_CRON`). Fetched invoices are stored under `SALVATION_ARMY_STORAGE_PATH` and logged in `salvationArmySyncLog`.
+- Monitor recent attempts with `GET /integrations/salvation-army/sync/logs?limit=20`. Credential status is updated on each run, so Ops can spot repeated failures quickly.
+- Manual invoice ingestion remains available at `POST /integrations/salvation-army/invoices`, but the service now prevents duplicate imports by invoice number.
