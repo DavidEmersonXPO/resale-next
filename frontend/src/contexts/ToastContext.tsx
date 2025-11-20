@@ -1,5 +1,7 @@
-import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import { Toast, ToastType, ToastProps } from '../components/Toast';
+import { createContext, useContext, useState, useCallback } from 'react';
+import type { ReactNode } from 'react';
+import { Toast } from '../components/Toast';
+import type { ToastType, ToastProps } from '../components/Toast';
 
 interface ToastItem extends Omit<ToastProps, 'onDismiss'> {
   id: string;
