@@ -81,7 +81,7 @@ export class FacebookMarketplaceAdapter implements ListingAdapter {
       const result: PublishResult = {
         platform: ListingPlatform.FACEBOOK_MARKETPLACE,
         success: false,
-        status: 'pending_manual',
+        status: 'draft',
         message:
           'Facebook Marketplace requires manual posting. Download the listing kit and use it to create your listing on Facebook.',
         metadata: {
@@ -89,6 +89,7 @@ export class FacebookMarketplaceAdapter implements ListingAdapter {
           title: listing.title,
           price: Number(listing.askingPrice),
           location: listing.location,
+          requiresManualPosting: true,
           instructions: [
             '1. Visit Facebook Marketplace',
             '2. Click "Create New Listing"',
