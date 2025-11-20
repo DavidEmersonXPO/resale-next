@@ -2,10 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { Prisma } from '@prisma/client';
+import { Prisma, InventoryStatus, PurchaseSource } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { SalvationArmyCredentialService } from './salvation-army-credential.service';
 import { SalvationArmyHttpService } from './salvation-army-http.service';
+import { InvoiceHtmlParserService } from './invoice-html-parser.service';
 import {
   SalvationArmyAuthError,
   SalvationArmyFetchError,
@@ -15,16 +16,22 @@ import {
 export class SalvationArmySyncService {
   private readonly logger = new Logger(SalvationArmySyncService.name);
   private readonly storagePath: string;
+  private readonly autoCreatePurchases: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly credentialService: SalvationArmyCredentialService,
     private readonly httpService: SalvationArmyHttpService,
+    private readonly invoiceParser: InvoiceHtmlParserService,
     configService: ConfigService,
   ) {
     this.storagePath =
       configService.get<string>('integrations.salvationArmy.storagePath') ??
       './data/salvation-army';
+    this.autoCreatePurchases =
+      configService.get<boolean>(
+        'integrations.salvationArmy.autoCreatePurchases',
+      ) ?? true;
   }
 
   async sync() {
@@ -43,19 +50,45 @@ export class SalvationArmySyncService {
       );
 
       let stored = 0;
+      let parsed = 0;
+      let purchasesCreated = 0;
+
       for (const invoice of invoices) {
         await this.storeInvoiceDocument(invoice.invoiceId, invoice.html);
         stored += 1;
+
+        // Parse invoice and auto-create purchase if enabled
+        if (this.autoCreatePurchases) {
+          const parsedInvoice = this.invoiceParser.parseInvoiceHtml(
+            invoice.html,
+          );
+
+          if (parsedInvoice) {
+            parsed += 1;
+            const created = await this.createPurchaseFromInvoice(
+              parsedInvoice,
+            );
+            if (created) {
+              purchasesCreated += 1;
+            }
+          } else {
+            this.logger.warn(
+              `Failed to parse invoice ${invoice.invoiceId}, purchase not created`,
+            );
+          }
+        }
       }
 
       if (wonItems?.length) {
-        await this.storeJsonDocument(
-          `won-items-${Date.now()}`,
-          wonItems,
-        );
+        await this.storeJsonDocument(`won-items-${Date.now()}`, wonItems);
       }
 
-      const message = `Downloaded ${stored} invoices`;
+      const message =
+        `Downloaded ${stored} invoices` +
+        (this.autoCreatePurchases
+          ? `, parsed ${parsed}, created ${purchasesCreated} purchases`
+          : '');
+
       await this.completeLog(log.id, 'Success', message, stored);
       await this.credentialService.updateStatus(
         entity.id,
@@ -64,7 +97,7 @@ export class SalvationArmySyncService {
         stored,
       );
 
-      return { stored };
+      return { stored, parsed, purchasesCreated };
     } catch (error) {
       const message = this.formatError(error);
       this.logger.error('Salvation Army sync failed', error as Error);
@@ -111,6 +144,80 @@ export class SalvationArmySyncService {
         metadata: payload as Prisma.InputJsonValue,
       },
     });
+  }
+
+  private async createPurchaseFromInvoice(
+    parsedInvoice: any,
+  ): Promise<boolean> {
+    try {
+      // Check if purchase already exists
+      const existing = await this.prisma.purchase.findFirst({
+        where: {
+          orderNumber: parsedInvoice.invoiceNumber,
+          source: PurchaseSource.SALVATION_ARMY,
+        },
+        select: { id: true },
+      });
+
+      if (existing) {
+        this.logger.log(
+          `Purchase for invoice ${parsedInvoice.invoiceNumber} already exists, skipping`,
+        );
+        return false;
+      }
+
+      // Create the purchase
+      await this.prisma.$transaction(async (tx) => {
+        const supplier = await tx.supplier.upsert({
+          where: { externalId: parsedInvoice.invoiceNumber },
+          update: {
+            name: parsedInvoice.warehouse ?? 'Salvation Army',
+            source: PurchaseSource.SALVATION_ARMY,
+          },
+          create: {
+            name: parsedInvoice.warehouse ?? 'Salvation Army',
+            source: PurchaseSource.SALVATION_ARMY,
+            externalId: parsedInvoice.invoiceNumber,
+          },
+        });
+
+        await tx.purchase.create({
+          data: {
+            source: PurchaseSource.SALVATION_ARMY,
+            purchaseDate: parsedInvoice.invoiceDate,
+            orderNumber: parsedInvoice.invoiceNumber,
+            totalCost: parsedInvoice.total,
+            shippingCost: parsedInvoice.shipping,
+            fees: parsedInvoice.fees,
+            status: InventoryStatus.INBOUND,
+            supplierId: supplier.id,
+            notes: `Auto-imported from parsed invoice (${parsedInvoice.warehouse ?? 'warehouse'})`,
+            items: {
+              create: parsedInvoice.items.map((item: any) => ({
+                title: item.description,
+                description: item.lotNumber
+                  ? `Lot ${item.lotNumber}`
+                  : undefined,
+                quantity: item.quantity,
+                unitCost: item.price,
+                inventoryStatus: InventoryStatus.INBOUND,
+              })),
+            },
+          },
+        });
+      });
+
+      this.logger.log(
+        `Auto-created purchase from invoice ${parsedInvoice.invoiceNumber}`,
+      );
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Failed to create purchase from invoice ${parsedInvoice.invoiceNumber}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      return false;
+    }
   }
 
   private formatError(error: unknown) {

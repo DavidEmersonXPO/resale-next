@@ -201,6 +201,132 @@ export class ListingPublisherService {
     return { removed: removed.length };
   }
 
+  async getQueueStats() {
+    const states: Array<
+      'completed' | 'failed' | 'waiting' | 'active' | 'delayed'
+    > = ['completed', 'failed', 'waiting', 'active', 'delayed'];
+
+    const counts: Record<string, number> = {};
+    for (const state of states) {
+      counts[state] = await this.queue.getJobCountByTypes(state);
+    }
+
+    // Get platform breakdown
+    const jobs = await this.queue.getJobs(states, 0, 1000);
+    const platformBreakdown: Record<
+      string,
+      Record<string, number>
+    > = {};
+
+    for (const job of jobs) {
+      const platform = job.data?.platform || 'unknown';
+      const state = await job.getState();
+
+      if (!platformBreakdown[platform]) {
+        platformBreakdown[platform] = {};
+      }
+      platformBreakdown[platform][state] =
+        (platformBreakdown[platform][state] || 0) + 1;
+    }
+
+    return {
+      total: jobs.length,
+      byState: counts,
+      byPlatform: platformBreakdown,
+    };
+  }
+
+  async getPlatformStats(platform: ListingPlatform | string) {
+    const jobs = await this.queue.getJobs(
+      ['completed', 'failed', 'waiting', 'active', 'delayed'],
+      0,
+      1000,
+    );
+
+    const platformJobs = jobs.filter((job) => job.data?.platform === platform);
+
+    let completed = 0;
+    let failed = 0;
+    let pending = 0;
+
+    for (const job of platformJobs) {
+      const state = await job.getState();
+      if (state === 'completed') completed++;
+      else if (state === 'failed') failed++;
+      else pending++;
+    }
+
+    const total = completed + failed;
+    const successRate = total > 0 ? completed / total : 0;
+
+    return {
+      platform,
+      total: platformJobs.length,
+      completed,
+      failed,
+      pending,
+      successRate,
+    };
+  }
+
+  async retryFailedJobs(options: { platform?: string; limit?: number }) {
+    const limit = options.limit || 10;
+    const failedJobs = await this.queue.getJobs(['failed'], 0, limit - 1);
+
+    const filtered = options.platform
+      ? failedJobs.filter((job) => job.data?.platform === options.platform)
+      : failedJobs;
+
+    const retried: string[] = [];
+    for (const job of filtered) {
+      await job.retry();
+      retried.push(String(job.id));
+    }
+
+    await this.metrics.updateQueueMetrics();
+    return { retried: retried.length, jobIds: retried };
+  }
+
+  async archiveOldJobs(olderThanDays: number) {
+    const olderThanMs = olderThanDays * 24 * 60 * 60 * 1000;
+    const cutoffDate = Date.now() - olderThanMs;
+
+    // Get all completed and failed jobs
+    const completedJobs = await this.queue.getJobs(['completed'], 0, 1000);
+    const failedJobs = await this.queue.getJobs(['failed'], 0, 1000);
+    const allJobs = [...completedJobs, ...failedJobs];
+
+    const archived: Array<{
+      jobId: string;
+      platform: string;
+      state: string;
+      result: any;
+    }> = [];
+
+    for (const job of allJobs) {
+      if (job.timestamp < cutoffDate) {
+        const state = await job.getState();
+        archived.push({
+          jobId: String(job.id),
+          platform: job.data?.platform || 'unknown',
+          state,
+          result: job.returnvalue,
+        });
+        await job.remove();
+      }
+    }
+
+    await this.metrics.updateQueueMetrics();
+
+    // Store archived jobs in database for long-term retention
+    // This could be extended to use a dedicated archive table
+    return {
+      archived: archived.length,
+      cutoffDate: new Date(cutoffDate).toISOString(),
+      jobs: archived,
+    };
+  }
+
   private failedValidation(
     platform: ListingPlatform,
     validation: ValidationResult,

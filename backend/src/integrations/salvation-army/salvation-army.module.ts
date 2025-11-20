@@ -7,6 +7,7 @@ import { SalvationArmyCredentialService } from './salvation-army-credential.serv
 import { SalvationArmyHttpService } from './salvation-army-http.service';
 import { SalvationArmySyncService } from './salvation-army-sync.service';
 import { SalvationArmySyncScheduler } from './salvation-army-sync.scheduler';
+import { InvoiceHtmlParserService } from './invoice-html-parser.service';
 
 @Module({
   imports: [PurchasesModule],
@@ -16,6 +17,7 @@ import { SalvationArmySyncScheduler } from './salvation-army-sync.scheduler';
     SalvationArmyHttpService,
     SalvationArmySyncService,
     SalvationArmySyncScheduler,
+    InvoiceHtmlParserService,
     EncryptionService,
   ],
   controllers: [SalvationArmyController],

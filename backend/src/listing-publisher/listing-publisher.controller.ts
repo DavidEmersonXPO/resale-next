@@ -16,6 +16,16 @@ export class ListingPublisherController {
     return this.listingPublisherService.listRecentJobs(bounded);
   }
 
+  @Get('jobs/stats')
+  getQueueStats() {
+    return this.listingPublisherService.getQueueStats();
+  }
+
+  @Get('jobs/stats/:platform')
+  getPlatformStats(@Param('platform') platform: string) {
+    return this.listingPublisherService.getPlatformStats(platform);
+  }
+
   @Get('jobs/:jobId')
   getJobStatus(@Param('jobId') jobId: string) {
     return this.listingPublisherService.getJobStatus(jobId);
@@ -24,6 +34,13 @@ export class ListingPublisherController {
   @Post('jobs/:jobId/retry')
   retryJob(@Param('jobId') jobId: string) {
     return this.listingPublisherService.retryJob(jobId);
+  }
+
+  @Post('jobs/retry-failed')
+  retryFailedJobs(
+    @Body() payload: { platform?: string; limit?: number },
+  ) {
+    return this.listingPublisherService.retryFailedJobs(payload);
   }
 
   @Post('jobs/clean')
@@ -35,5 +52,10 @@ export class ListingPublisherController {
     },
   ) {
     return this.listingPublisherService.cleanJobs(payload);
+  }
+
+  @Post('jobs/archive')
+  archiveOldJobs(@Body() payload: { olderThanDays: number }) {
+    return this.listingPublisherService.archiveOldJobs(payload.olderThanDays);
   }
 }

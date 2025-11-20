@@ -8,6 +8,7 @@ import { ListingComposer } from './pages/ListingComposer';
 import { PlatformCredentialsPage } from './pages/PlatformCredentialsPage';
 import { PurchasesPage } from './pages/PurchasesPage';
 import { ListingTemplatesPage } from './pages/ListingTemplatesPage';
+import { ToastProvider } from './contexts/ToastContext';
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const token = authStore((state) => state.token);
@@ -32,7 +33,8 @@ export const App = () => {
   }
 
   return (
-    <BrowserRouter>
+    <ToastProvider>
+      <BrowserRouter>
       <Routes>
         <Route
           path="/"
@@ -78,6 +80,7 @@ export const App = () => {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
+    </ToastProvider>
   );
 };
 
