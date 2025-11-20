@@ -3,10 +3,19 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma, PurchaseSource, InventoryStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { GoodwillCredentialService } from './goodwill-credential.service';
-import { GoodwillCsvParser, GoodwillOrderRecord, GoodwillOrderStatus } from './goodwill-csv.parser';
+import {
+  GoodwillCsvParser,
+  GoodwillOrderRecord,
+  GoodwillOrderStatus,
+} from './goodwill-csv.parser';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 import { GoodwillHttpService } from './goodwill-http.service';
+import {
+  GoodwillAuthError,
+  GoodwillDownloadError,
+  GoodwillConfigurationError,
+} from './errors';
 
 @Injectable()
 export class GoodwillSyncService {
@@ -20,7 +29,9 @@ export class GoodwillSyncService {
     private readonly httpService: GoodwillHttpService,
     configService: ConfigService,
   ) {
-    this.csvDirectory = configService.get<string>('integrations.goodwillCsvDirectory') ?? './data/goodwill';
+    this.csvDirectory =
+      configService.get<string>('integrations.goodwillCsvDirectory') ??
+      './data/goodwill';
   }
 
   async sync() {
@@ -32,44 +43,99 @@ export class GoodwillSyncService {
     });
 
     try {
-      let records = await this.httpService.fetchRemoteOrders(username, password);
+      let records: GoodwillOrderRecord[] = [];
+      try {
+        records = await this.httpService.fetchRemoteOrders(
+          username,
+          password,
+        );
+      } catch (error) {
+        throw error;
+      }
+
       if (!records.length) {
         records = await this.loadRecordsFromDirectory();
       }
       if (!records.length) {
         await this.completeLog(log.id, 'NoData', 'No CSV files located');
-        await this.credentialService.updateSyncStatus(entity.id, 'NoData', 'No CSV files found', 0);
+        await this.credentialService.updateSyncStatus(
+          entity.id,
+          'NoData',
+          'No CSV files found',
+          0,
+        );
         return { imported: 0 };
       }
 
       let imported = 0;
-      for (const record of records) {
-        const result = await this.upsertRecord(record);
-        if (result) {
-          imported += 1;
+      const supplierCache = new Map<string, string>();
+      await this.prisma.$transaction(async (tx) => {
+        for (const record of records) {
+          const result = await this.upsertRecord(
+            record,
+            tx,
+            supplierCache,
+          );
+          if (result) {
+            imported += 1;
+          }
         }
-      }
+      });
 
-      await this.completeLog(log.id, 'Success', `Imported ${imported} orders`, imported);
-      await this.credentialService.updateSyncStatus(entity.id, 'Success', `Imported ${imported} orders`, imported);
+      await this.completeLog(
+        log.id,
+        'Success',
+        `Imported ${imported} orders`,
+        imported,
+      );
+      await this.credentialService.updateSyncStatus(
+        entity.id,
+        'Success',
+        `Imported ${imported} orders`,
+        imported,
+      );
 
       return { imported };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Goodwill CSV sync failed: ${message}`, error instanceof Error ? error.stack : undefined);
+      const message = this.formatSyncError(error);
+      this.logger.error(
+        `Goodwill CSV sync failed: ${message}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       await this.completeLog(log.id, 'Failed', message);
-      await this.credentialService.updateSyncStatus(entity.id, 'Failed', message, 0);
+      await this.credentialService.updateSyncStatus(
+        entity.id,
+        'Failed',
+        message,
+        0,
+      );
       throw error;
     }
   }
 
+  private formatSyncError(error: unknown) {
+    if (error instanceof GoodwillAuthError) {
+      return `Authentication failed: ${error.message}`;
+    }
+    if (error instanceof GoodwillDownloadError) {
+      return `Download failed: ${error.message}`;
+    }
+    if (error instanceof GoodwillConfigurationError) {
+      return `Configuration error: ${error.message}`;
+    }
+    return error instanceof Error ? error.message : 'Unknown error';
+  }
+
   private async loadRecordsFromDirectory(): Promise<GoodwillOrderRecord[]> {
     const dir = this.csvDirectory;
-    const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
+    const entries = await fs
+      .readdir(dir, { withFileTypes: true })
+      .catch(() => []);
     const records: GoodwillOrderRecord[] = [];
 
     for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.csv')) continue;
+      if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.csv'))
+        continue;
       const fullPath = join(dir, entry.name);
       const content = await fs.readFile(fullPath, 'utf8');
       const status = entry.name.toLowerCase().includes('shipped')
@@ -81,12 +147,16 @@ export class GoodwillSyncService {
     return records;
   }
 
-  private async upsertRecord(record: GoodwillOrderRecord) {
+  private async upsertRecord(
+    record: GoodwillOrderRecord,
+    tx: Prisma.TransactionClient,
+    supplierCache: Map<string, string>,
+  ) {
     if (!record.orderNumber) {
       return false;
     }
 
-    const existing = await this.prisma.purchase.findFirst({
+    const existing = await tx.purchase.findFirst({
       where: {
         orderNumber: record.orderNumber,
         source: PurchaseSource.GOODWILL,
@@ -98,16 +168,23 @@ export class GoodwillSyncService {
       orderNumber: record.orderNumber,
       source: PurchaseSource.GOODWILL,
       purchaseDate: record.endedAt ?? new Date(),
-      totalCost: new Prisma.Decimal(record.price + record.shippingCost + record.handlingFee + record.taxAmount),
-      shippingCost: new Prisma.Decimal(record.shippingCost + record.handlingFee),
+      totalCost: new Prisma.Decimal(
+        record.price +
+          record.shippingCost +
+          record.handlingFee +
+          record.taxAmount,
+      ),
+      shippingCost: new Prisma.Decimal(
+        record.shippingCost + record.handlingFee,
+      ),
       fees: new Prisma.Decimal(record.taxAmount),
       status: InventoryStatus.IN_STOCK,
       notes: `Imported from ShopGoodwill (${record.status})`,
-      supplierId: await this.ensureSupplier(record.seller),
+      supplierId: await this.ensureSupplier(record.seller, tx, supplierCache),
     };
 
     if (!existing) {
-      await this.prisma.purchase.create({
+      await tx.purchase.create({
         data: {
           ...purchaseData,
           items: {
@@ -115,7 +192,9 @@ export class GoodwillSyncService {
               {
                 title: record.itemTitle ?? 'ShopGoodwill Item',
                 quantity: record.quantity,
-                unitCost: new Prisma.Decimal(record.price / Math.max(record.quantity, 1)),
+                unitCost: new Prisma.Decimal(
+                  record.price / Math.max(record.quantity, 1),
+                ),
               },
             ],
           },
@@ -124,7 +203,7 @@ export class GoodwillSyncService {
       return true;
     }
 
-    await this.prisma.purchase.update({
+    await tx.purchase.update({
       where: { id: existing.id },
       data: {
         ...purchaseData,
@@ -134,7 +213,9 @@ export class GoodwillSyncService {
             {
               title: record.itemTitle ?? 'ShopGoodwill Item',
               quantity: record.quantity,
-              unitCost: new Prisma.Decimal(record.price / Math.max(record.quantity, 1)),
+              unitCost: new Prisma.Decimal(
+                record.price / Math.max(record.quantity, 1),
+              ),
             },
           ],
         },
@@ -144,28 +225,44 @@ export class GoodwillSyncService {
     return true;
   }
 
-  private async ensureSupplier(name?: string | null) {
+  private async ensureSupplier(
+    name: string | null | undefined,
+    tx: Prisma.TransactionClient,
+    cache: Map<string, string>,
+  ) {
     const supplierName = name?.trim() || 'ShopGoodwill';
-    const existing = await this.prisma.supplier.findFirst({
+    const cacheKey = supplierName.toLowerCase();
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+    const existing = await tx.supplier.findFirst({
       where: {
         name: supplierName,
         source: PurchaseSource.GOODWILL,
       },
     });
     if (existing) {
+      cache.set(cacheKey, existing.id);
       return existing.id;
     }
-    const supplier = await this.prisma.supplier.create({
+    const supplier = await tx.supplier.create({
       data: {
         name: supplierName,
         source: PurchaseSource.GOODWILL,
         notes: 'Imported via Goodwill sync',
       },
     });
+    cache.set(cacheKey, supplier.id);
     return supplier.id;
   }
 
-  private async completeLog(id: string, status: string, message?: string, imported = 0) {
+  private async completeLog(
+    id: string,
+    status: string,
+    message?: string,
+    imported = 0,
+  ) {
     await this.prisma.goodwillSyncLog.update({
       where: { id },
       data: {

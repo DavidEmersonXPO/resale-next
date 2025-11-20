@@ -8,7 +8,10 @@ import {
 
 @Injectable()
 export class SalvationArmyCredentialService {
-  constructor(private readonly prisma: PrismaService, private readonly encryption: EncryptionService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly encryption: EncryptionService,
+  ) {}
 
   async get(): Promise<SalvationArmyCredentialResponseDto> {
     const entity = await this.prisma.salvationArmyCredential.findFirst();
@@ -27,11 +30,15 @@ export class SalvationArmyCredentialService {
 
   async upsert(dto: UpdateSalvationArmyCredentialDto) {
     const existing = await this.prisma.salvationArmyCredential.findFirst();
-    const passwordEncrypted = dto.password ? this.encryption.encrypt(dto.password) : undefined;
+    const passwordEncrypted = dto.password
+      ? this.encryption.encrypt(dto.password)
+      : undefined;
 
     if (!existing) {
       if (!passwordEncrypted) {
-        throw new NotFoundException('Password required to configure Salvation Army credentials.');
+        throw new NotFoundException(
+          'Password required to configure Salvation Army credentials.',
+        );
       }
       await this.prisma.salvationArmyCredential.create({
         data: {
@@ -52,7 +59,9 @@ export class SalvationArmyCredentialService {
         autoSyncEnabled: dto.autoSyncEnabled,
         passwordEncrypted: passwordEncrypted ?? existing.passwordEncrypted,
         lastSyncStatus: 'Updated',
-        lastSyncMessage: passwordEncrypted ? 'Username/password updated' : 'Username updated',
+        lastSyncMessage: passwordEncrypted
+          ? 'Username/password updated'
+          : 'Username updated',
       },
     });
   }
@@ -66,10 +75,20 @@ export class SalvationArmyCredentialService {
     if (!password) {
       throw new NotFoundException('Salvation Army password missing.');
     }
-    return { username: entity.username, password, autoSyncEnabled: entity.autoSyncEnabled, entity };
+    return {
+      username: entity.username,
+      password,
+      autoSyncEnabled: entity.autoSyncEnabled,
+      entity,
+    };
   }
 
-  async updateStatus(entityId: string, status: string, message?: string, imported = 0) {
+  async updateStatus(
+    entityId: string,
+    status: string,
+    message?: string,
+    imported = 0,
+  ) {
     await this.prisma.salvationArmyCredential.update({
       where: { id: entityId },
       data: {

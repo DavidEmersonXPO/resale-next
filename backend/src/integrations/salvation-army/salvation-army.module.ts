@@ -8,7 +8,12 @@ import { SalvationArmyHttpService } from './salvation-army-http.service';
 
 @Module({
   imports: [PurchasesModule],
-  providers: [SalvationArmyService, SalvationArmyCredentialService, SalvationArmyHttpService, EncryptionService],
+  providers: [
+    SalvationArmyService,
+    SalvationArmyCredentialService,
+    SalvationArmyHttpService,
+    EncryptionService,
+  ],
   controllers: [SalvationArmyController],
 })
 export class SalvationArmyModule {}

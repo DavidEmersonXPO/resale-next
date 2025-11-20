@@ -25,7 +25,9 @@ export class ListingTemplatesService {
   }
 
   async findOne(id: string) {
-    const template = await this.prisma.listingTemplate.findUnique({ where: { id } });
+    const template = await this.prisma.listingTemplate.findUnique({
+      where: { id },
+    });
     if (!template) {
       throw new NotFoundException('Template not found');
     }

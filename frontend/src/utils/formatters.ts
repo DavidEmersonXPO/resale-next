@@ -1,11 +1,21 @@
-const currencyFormatter = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-});
+const formatterCache = new Map<string, Intl.NumberFormat>();
 
-export const formatCurrency = (value: string | number) => {
+const getCurrencyFormatter = (currency: string) => {
+  if (!formatterCache.has(currency)) {
+    formatterCache.set(
+      currency,
+      new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency,
+      }),
+    );
+  }
+  return formatterCache.get(currency)!;
+};
+
+export const formatCurrency = (value: string | number, currency = 'USD') => {
   const numericValue = typeof value === 'string' ? parseFloat(value) : value;
-  return currencyFormatter.format(numericValue || 0);
+  return getCurrencyFormatter(currency).format(numericValue || 0);
 };
 
 export const formatDate = (isoDate: string) => {

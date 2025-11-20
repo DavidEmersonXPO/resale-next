@@ -2,7 +2,10 @@ import { createCipheriv, createDecipheriv } from 'crypto';
 
 const ZERO_IV = Buffer.from('0000000000000000');
 
-export const encryptToUrlSafeBase64 = (plainText: string, base64UrlKey?: string | null): string => {
+export const encryptToUrlSafeBase64 = (
+  plainText: string,
+  base64UrlKey?: string | null,
+): string => {
   if (!plainText) return '';
   if (base64UrlKey) {
     const utf8Key = Buffer.from(base64UrlKey, 'utf8');
@@ -24,7 +27,10 @@ export const encryptToUrlSafeBase64 = (plainText: string, base64UrlKey?: string 
 
 const encryptAesCbc = (plainText: string, key: Buffer) => {
   const cipher = createCipheriv('aes-256-cbc', key, ZERO_IV);
-  const encrypted = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
+  const encrypted = Buffer.concat([
+    cipher.update(plainText, 'utf8'),
+    cipher.final(),
+  ]);
   return encodeURIComponent(encrypted.toString('base64'));
 };
 
@@ -59,6 +65,9 @@ const incrementCounter = (counter: Buffer) => {
 const decodeBase64Url = (value: string) => {
   if (!value) return Buffer.alloc(16);
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
-  const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=');
+  const padded = normalized.padEnd(
+    normalized.length + ((4 - (normalized.length % 4)) % 4),
+    '=',
+  );
   return Buffer.from(padded, 'base64');
 };

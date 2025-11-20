@@ -1,4 +1,8 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InventoryStatus, PurchaseSource } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -15,7 +19,9 @@ export class GoodwillService {
     private readonly prisma: PrismaService,
     private readonly purchasesService: PurchasesService,
   ) {
-    this.apiKey = this.configService.get<string>('integrations.goodwillApiKey') ?? undefined;
+    this.apiKey =
+      this.configService.get<string>('integrations.goodwillApiKey') ??
+      undefined;
   }
 
   async ingestManifest(manifest: GoodwillManifestDto) {
@@ -53,13 +59,17 @@ export class GoodwillService {
       })),
     });
 
-    this.logger.log(`Ingested Goodwill manifest ${manifest.manifestId} into purchase ${purchase.id}`);
+    this.logger.log(
+      `Ingested Goodwill manifest ${manifest.manifestId} into purchase ${purchase.id}`,
+    );
     return purchase;
   }
 
   private ensureConfigured() {
     if (!this.apiKey) {
-      throw new ServiceUnavailableException('Goodwill integration is not configured. Set GOODWILL_API_KEY.');
+      throw new ServiceUnavailableException(
+        'Goodwill integration is not configured. Set GOODWILL_API_KEY.',
+      );
     }
   }
 }

@@ -1,17 +1,44 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Condition, ListingPlatform, ListingStatus } from '@prisma/client';
+import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsDateString,
   IsEnum,
   IsInt,
-  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
-  IsArray,
+  Length,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+
+class DimensionsDto {
+  @ApiProperty({ required: false, example: 12 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  length?: number;
+
+  @ApiProperty({ required: false, example: 8 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  width?: number;
+
+  @ApiProperty({ required: false, example: 3 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  height?: number;
+
+  @ApiProperty({ required: false, example: 'in' })
+  @IsOptional()
+  @IsString()
+  unit?: string;
+}
 
 export class CreateListingDto {
   @ApiProperty({ enum: ListingPlatform })
@@ -29,13 +56,37 @@ export class CreateListingDto {
   description?: string;
 
   @ApiProperty()
+  @Type(() => Number)
   @IsNumber()
   askingPrice!: number;
 
   @ApiProperty({ required: false })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   feesEstimate?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  sku?: string;
+
+  @ApiProperty({ default: 'USD' })
+  @IsString()
+  @Length(3, 3)
+  currency: string = 'USD';
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  minPrice?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  shippingPrice?: number;
 
   @ApiProperty({ enum: ListingStatus, default: ListingStatus.DRAFT })
   @IsEnum(ListingStatus)
@@ -52,9 +103,20 @@ export class CreateListingDto {
   expiresAt?: string;
 
   @ApiProperty({ default: 1 })
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   quantity = 1;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  accountId?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  platformCredentialId?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
@@ -76,7 +138,32 @@ export class CreateListingDto {
   @IsString({ each: true })
   tags?: string[];
 
-  @ApiProperty({ required: false, description: 'Arbitrary platform override JSON' })
+  @ApiProperty({
+    required: false,
+    description: 'Arbitrary platform override JSON',
+  })
   @IsOptional()
   platformSettings?: Record<string, unknown>;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  weightLbs?: number;
+
+  @ApiProperty({ required: false, type: DimensionsDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DimensionsDto)
+  dimensions?: DimensionsDto;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  location?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  serialNumber?: string;
 }

@@ -10,8 +10,12 @@ import { promises as fs } from 'fs';
 export class MediaService {
   private readonly storagePath: string;
 
-  constructor(private readonly prisma: PrismaService, configService: ConfigService) {
-    this.storagePath = configService.get<string>('media.storagePath') ?? './storage/media';
+  constructor(
+    private readonly prisma: PrismaService,
+    configService: ConfigService,
+  ) {
+    this.storagePath =
+      configService.get<string>('media.storagePath') ?? './storage/media';
   }
 
   async saveUpload(file: Express.Multer.File, dto: UploadMediaDto) {

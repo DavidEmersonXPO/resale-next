@@ -5,6 +5,9 @@ import { authStore } from './stores/auth-store';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/Dashboard';
 import { ListingComposer } from './pages/ListingComposer';
+import { PlatformCredentialsPage } from './pages/PlatformCredentialsPage';
+import { PurchasesPage } from './pages/PurchasesPage';
+import { ListingTemplatesPage } from './pages/ListingTemplatesPage';
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const token = authStore((state) => state.token);
@@ -44,6 +47,30 @@ export const App = () => {
           element={
             <ProtectedRoute>
               <ListingComposer />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/platform-credentials"
+          element={
+            <ProtectedRoute>
+              <PlatformCredentialsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/purchases"
+          element={
+            <ProtectedRoute>
+              <PurchasesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/listing-templates"
+          element={
+            <ProtectedRoute>
+              <ListingTemplatesPage />
             </ProtectedRoute>
           }
         />

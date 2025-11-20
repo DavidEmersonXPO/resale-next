@@ -1,11 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { EncryptionService } from '../../common/security/encryption.service';
-import { UpdateGoodwillCredentialDto, GoodwillCredentialResponseDto } from './dto/goodwill-credential.dto';
+import {
+  UpdateGoodwillCredentialDto,
+  GoodwillCredentialResponseDto,
+} from './dto/goodwill-credential.dto';
 
 @Injectable()
 export class GoodwillCredentialService {
-  constructor(private readonly prisma: PrismaService, private readonly encryption: EncryptionService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly encryption: EncryptionService,
+  ) {}
 
   async getCredential(): Promise<GoodwillCredentialResponseDto> {
     const entity = await this.prisma.goodwillCredential.findFirst();
@@ -28,11 +34,15 @@ export class GoodwillCredentialService {
 
   async upsertCredential(dto: UpdateGoodwillCredentialDto) {
     const existing = await this.prisma.goodwillCredential.findFirst();
-    const passwordEncrypted = dto.password ? this.encryption.encrypt(dto.password) : undefined;
+    const passwordEncrypted = dto.password
+      ? this.encryption.encrypt(dto.password)
+      : undefined;
 
     if (!existing) {
       if (!passwordEncrypted) {
-        throw new NotFoundException('Password required for initial Goodwill credential setup.');
+        throw new NotFoundException(
+          'Password required for initial Goodwill credential setup.',
+        );
       }
       await this.prisma.goodwillCredential.create({
         data: {
@@ -53,7 +63,9 @@ export class GoodwillCredentialService {
         autoSyncEnabled: dto.autoSyncEnabled,
         passwordEncrypted: passwordEncrypted ?? existing.passwordEncrypted,
         lastSyncStatus: 'Updated',
-        lastSyncMessage: passwordEncrypted ? 'Username/password updated' : 'Username updated',
+        lastSyncMessage: passwordEncrypted
+          ? 'Username/password updated'
+          : 'Username updated',
       },
     });
   }
@@ -67,10 +79,20 @@ export class GoodwillCredentialService {
     if (!password) {
       throw new NotFoundException('Goodwill password missing.');
     }
-    return { username: entity.username, password, autoSyncEnabled: entity.autoSyncEnabled, entity };
+    return {
+      username: entity.username,
+      password,
+      autoSyncEnabled: entity.autoSyncEnabled,
+      entity,
+    };
   }
 
-  async updateSyncStatus(entityId: string, status: string, message?: string, imported = 0) {
+  async updateSyncStatus(
+    entityId: string,
+    status: string,
+    message?: string,
+    imported = 0,
+  ) {
     await this.prisma.goodwillCredential.update({
       where: { id: entityId },
       data: {

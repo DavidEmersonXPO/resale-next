@@ -107,7 +107,9 @@ export class PurchasesService {
         data: {
           orderNumber: rest.orderNumber,
           source: rest.source,
-          purchaseDate: rest.purchaseDate ? new Date(rest.purchaseDate) : undefined,
+          purchaseDate: rest.purchaseDate
+            ? new Date(rest.purchaseDate)
+            : undefined,
           totalCost: rest.totalCost,
           shippingCost: rest.shippingCost,
           fees: rest.fees,

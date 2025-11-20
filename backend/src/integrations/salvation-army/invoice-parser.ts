@@ -23,7 +23,10 @@ export function parseInvoiceSummaries(html: string): InvoiceSummary[] {
   return summaries;
 }
 
-export function parseInvoiceDetail(invoiceId: string, html: string): InvoiceLineItem[] {
+export function parseInvoiceDetail(
+  invoiceId: string,
+  html: string,
+): InvoiceLineItem[] {
   const $ = load(html);
   const items: InvoiceLineItem[] = [];
   $('.invoice-line').each((index, el) => {

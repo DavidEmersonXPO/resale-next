@@ -35,7 +35,10 @@ const toDate = (value?: string) => {
 };
 
 export class GoodwillCsvParser {
-  parse(csvContent: string, status: GoodwillOrderStatus): GoodwillOrderRecord[] {
+  parse(
+    csvContent: string,
+    status: GoodwillOrderStatus,
+  ): GoodwillOrderRecord[] {
     const rows: Record<string, string>[] = parse(csvContent, {
       columns: true,
       skip_empty_lines: true,
@@ -55,7 +58,9 @@ export class GoodwillCsvParser {
       handlingFee: currencyToNumber(row['Handling']),
       taxAmount: currencyToNumber(row['Tax']),
       trackingNumber: row['Tracking #'] ?? row['Tracking'],
-      endedAt: toDate(status === GoodwillOrderStatus.OPEN ? row['Ended (PT)'] : row['Date']),
+      endedAt: toDate(
+        status === GoodwillOrderStatus.OPEN ? row['Ended (PT)'] : row['Date'],
+      ),
     }));
   }
 }

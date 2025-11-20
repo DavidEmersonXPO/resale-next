@@ -9,7 +9,9 @@ export class EncryptionService {
   constructor(private readonly configService: ConfigService) {
     const secret = this.configService.get<string>('encryptionKey');
     if (!secret || secret.length < 16) {
-      throw new Error('ENCRYPTION_KEY must be set and at least 16 characters long');
+      throw new Error(
+        'ENCRYPTION_KEY must be set and at least 16 characters long',
+      );
     }
     this.key = Buffer.from(secret.padEnd(32, '0').slice(0, 32));
   }
@@ -17,7 +19,10 @@ export class EncryptionService {
   encrypt(plainText: string): string {
     const iv = randomBytes(12);
     const cipher = createCipheriv('aes-256-gcm', this.key, iv);
-    const encrypted = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
+    const encrypted = Buffer.concat([
+      cipher.update(plainText, 'utf8'),
+      cipher.final(),
+    ]);
     const tag = cipher.getAuthTag();
     return Buffer.concat([iv, tag, encrypted]).toString('base64');
   }

@@ -8,7 +8,10 @@ import { CreateUserDto } from '../users/dto/create-user.dto';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService, private readonly usersService: UsersService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly usersService: UsersService,
+  ) {}
 
   @Post('login')
   login(@Body() dto: LoginDto) {

@@ -1,7 +1,9 @@
 import * as Joi from 'joi';
 
 export const validationSchema = Joi.object({
-  NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
+  NODE_ENV: Joi.string()
+    .valid('development', 'test', 'production')
+    .default('development'),
   PORT: Joi.number().default(5000),
   DATABASE_URL: Joi.string().uri().required(),
   JWT_SECRET: Joi.string().min(16).required(),
@@ -13,16 +15,27 @@ export const validationSchema = Joi.object({
   STRIPE_SECRET_KEY: Joi.string().allow('').optional(),
   MEDIA_STORAGE_PATH: Joi.string().default('./storage/media'),
   ENCRYPTION_KEY: Joi.string().min(16).required(),
+  REDIS_URL: Joi.string().uri().optional().allow(''),
+  REDIS_HOST: Joi.string().default('127.0.0.1'),
+  REDIS_PORT: Joi.number().default(6379),
+  REDIS_USERNAME: Joi.string().allow('').optional(),
+  REDIS_PASSWORD: Joi.string().allow('').optional(),
+  REDIS_TLS: Joi.string().valid('true', 'false').optional(),
+  REDIS_PREFIX: Joi.string().default('resale'),
   GOODWILL_CSV_DIRECTORY: Joi.string().default('./data/goodwill'),
   GOODWILL_BASE_URL: Joi.string().uri().default('https://shopgoodwill.com'),
-  GOODWILL_BUYER_API_BASE_URL: Joi.string().uri().default('https://buyerapi.shopgoodwill.com'),
+  GOODWILL_BUYER_API_BASE_URL: Joi.string()
+    .uri()
+    .default('https://buyerapi.shopgoodwill.com'),
   GOODWILL_LOGIN_PAGE_PATH: Joi.string().default('/signin'),
   GOODWILL_LOGIN_PATH: Joi.string().default('/api/SignIn/Login'),
   GOODWILL_LOGIN_METHOD: Joi.string().valid('GET', 'POST').default('POST'),
   GOODWILL_LOGIN_CONTENT_TYPE: Joi.string().default('application/json'),
   GOODWILL_LOGIN_APP_VERSION: Joi.string().allow('').optional(),
   GOODWILL_LOGIN_USER_AGENT: Joi.string().allow('').optional(),
-  GOODWILL_LOGIN_REMEMBER_ME: Joi.string().valid('true', 'false').default('false'),
+  GOODWILL_LOGIN_REMEMBER_ME: Joi.string()
+    .valid('true', 'false')
+    .default('false'),
   GOODWILL_LOGIN_ENCRYPTION_KEY: Joi.string().allow('').optional(),
   GOODWILL_USERNAME_FIELD: Joi.string().default('userName'),
   GOODWILL_PASSWORD_FIELD: Joi.string().default('password'),
@@ -33,9 +46,43 @@ export const validationSchema = Joi.object({
   GOODWILL_ORDER_DETAIL_JSON_PATH: Joi.string().allow('').optional(),
   GOODWILL_DETAIL_THROTTLE_MS: Joi.number().default(1500),
   GOODWILL_REQUEST_TIMEOUT: Joi.number().default(60),
-  SALVATION_ARMY_BASE_URL: Joi.string().uri().default('https://www.shopthesalvationarmy.com'),
+  GOODWILL_REQUEST_MAX_RETRIES: Joi.number().default(3),
+  GOODWILL_SYNC_ENABLED: Joi.string().valid('true', 'false').optional(),
+  GOODWILL_SYNC_CRON: Joi.string().optional(),
+  SALVATION_ARMY_BASE_URL: Joi.string()
+    .uri()
+    .default('https://www.shopthesalvationarmy.com'),
   SALVATION_ARMY_LOGIN_PATH: Joi.string().default('/Account/LogOn'),
   SALVATION_ARMY_INVOICES_URL: Joi.string().default('/Account/Invoices'),
   SALVATION_ARMY_WON_URL: Joi.string().default('/Account/Won'),
-  SALVATION_ARMY_LISTING_BASE_URL: Joi.string().uri().default('https://www.shopthesalvationarmy.com'),
+  SALVATION_ARMY_LISTING_BASE_URL: Joi.string()
+    .uri()
+    .default('https://www.shopthesalvationarmy.com'),
+  FRONTEND_URL: Joi.string().uri().default('http://localhost:5173'),
+  EBAY_ENVIRONMENT: Joi.string()
+    .valid('Sandbox', 'Production')
+    .default('Sandbox'),
+  EBAY_SCOPES: Joi.string().default(
+    'https://api.ebay.com/oauth/api_scope/sell.item https://api.ebay.com/oauth/api_scope/sell.inventory',
+  ),
+  EBAY_SANDBOX_CLIENT_ID: Joi.string().allow('').optional(),
+  EBAY_SANDBOX_CLIENT_SECRET: Joi.string().allow('').optional(),
+  EBAY_SANDBOX_REDIRECT_URI: Joi.string().uri().optional(),
+  EBAY_SANDBOX_AUTH_URL: Joi.string().uri().optional(),
+  EBAY_SANDBOX_TOKEN_URL: Joi.string().uri().optional(),
+  EBAY_SANDBOX_API_BASE_URL: Joi.string().uri().optional(),
+  EBAY_PRODUCTION_CLIENT_ID: Joi.string().allow('').optional(),
+  EBAY_PRODUCTION_CLIENT_SECRET: Joi.string().allow('').optional(),
+  EBAY_PRODUCTION_REDIRECT_URI: Joi.string().uri().optional(),
+  EBAY_PRODUCTION_AUTH_URL: Joi.string().uri().optional(),
+  EBAY_PRODUCTION_TOKEN_URL: Joi.string().uri().optional(),
+  EBAY_PRODUCTION_API_BASE_URL: Joi.string().uri().optional(),
+  EBAY_SUCCESS_REDIRECT: Joi.string().uri().optional(),
+  EBAY_FAILURE_REDIRECT: Joi.string().uri().optional(),
+  EBAY_MARKETPLACE_ID: Joi.string().default('EBAY_US'),
+  EBAY_PAYMENT_POLICY_ID: Joi.string().allow('').optional(),
+  EBAY_FULFILLMENT_POLICY_ID: Joi.string().allow('').optional(),
+  EBAY_RETURN_POLICY_ID: Joi.string().allow('').optional(),
+  EBAY_POLICY_REFRESH_ENABLED: Joi.string().valid('true', 'false').optional(),
+  EBAY_POLICY_REFRESH_CRON: Joi.string().optional(),
 });

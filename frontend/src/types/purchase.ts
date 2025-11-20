@@ -22,6 +22,7 @@ export interface Purchase {
   shippingCost?: string | null;
   fees?: string | null;
   status: string;
+  notes?: string | null;
   items: PurchaseItem[];
   supplier?: Supplier | null;
 }

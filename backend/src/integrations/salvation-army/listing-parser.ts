@@ -1,9 +1,16 @@
 import { load } from 'cheerio';
 import { BidEntry, ListingDetail } from './types';
 
-export function parseListingDetail(listingId: string, html: string): ListingDetail {
+export function parseListingDetail(
+  listingId: string,
+  html: string,
+): ListingDetail {
   const $ = load(html);
-  const description = $('#ctl00_ctl00_cphContent_MainContent_ctl00_lblDescription').text().trim();
+  const description = $(
+    '#ctl00_ctl00_cphContent_MainContent_ctl00_lblDescription',
+  )
+    .text()
+    .trim();
   const categories = $('#breadcrumb li a')
     .map((_, el) => $(el).text().trim())
     .get()

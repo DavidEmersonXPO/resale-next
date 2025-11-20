@@ -6,7 +6,10 @@ import { JwtPayload } from './jwt-payload';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly usersService: UsersService, private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   async validateUser(dto: LoginDto) {
     const user = await this.usersService.findByEmail(dto.email);
@@ -14,7 +17,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const passwordValid = await this.usersService.validatePassword(dto.password, user.passwordHash);
+    const passwordValid = await this.usersService.validatePassword(
+      dto.password,
+      user.passwordHash,
+    );
     if (!passwordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -24,7 +30,11 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const user = await this.validateUser(dto);
-    const payload: JwtPayload = { sub: user.id, email: user.email, roles: user.roles };
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      roles: user.roles,
+    };
     return {
       accessToken: await this.jwtService.signAsync(payload),
       user: {

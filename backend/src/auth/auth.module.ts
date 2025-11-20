@@ -17,7 +17,8 @@ import { SignOptions } from 'jsonwebtoken';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const signOptions: SignOptions = {
-          expiresIn: (config.get<string>('jwt.expiresIn') ?? '1d') as SignOptions['expiresIn'],
+          expiresIn: (config.get<string>('jwt.expiresIn') ??
+            '1d') as SignOptions['expiresIn'],
         };
         return {
           secret: config.get<string>('jwt.secret'),

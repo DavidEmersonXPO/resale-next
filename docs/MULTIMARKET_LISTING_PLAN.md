@@ -72,7 +72,7 @@ We already have a `Listing` entity with key fields. To support all marketplaces 
    - Build “Listing Composer” page to edit canonical fields + platform previews.
    - Add “Generate kit” action that produces downloadable zip with resized images + text.
 3. **Automation Foundations**
-   - Implement eBay adapter first (official API).
+  - Implement eBay adapter first (official API). *(DONE – OAuth flow, credential page, and publisher trigger wired; queueing + Sell API automation still pending.)*
    - Create queue + worker (BullMQ or Temporal) for asynchronous publishing.
    - Add logging + retry policies per platform.
 4. **Headless Automation Research**
@@ -88,7 +88,13 @@ We already have a `Listing` entity with key fields. To support all marketplaces 
 ## Deliverables
 - Design document (this file) for reference.
 - Follow-up tasks:
-  1. Implement canonical schema extensions + migrations.
+  1. Implement canonical schema extensions + migrations. (DONE - Prisma `Listing` additions, PlatformCredential module, initial migration)
   2. Build listing composer UI/UX.
   3. Implement eBay adapter + publishing worker.
   4. Prototype kit generator for manual uploads.
+
+## Immediate Next Steps
+- **Queue observability:** expand to include metrics and deeper analytics (e.g., Prometheus exporters, long-term job archival, per-platform success rates). Current UI shows the last few jobs directly in the dashboard.
+- **Policy tooling follow-ups:** integrate policy refresh results into alerts/notifications and extend defaults to other marketplaces once adapters are added. The scheduler now logs refresh attempts and surfaces them in the dashboard.
+- **Operational controls:** API support exists for retrying failed publish jobs and cleaning old queue items; long-term, consider automated retention policies and batching retries per platform.
+- **Integration reliability:** Goodwill sync now has retry/backoff, transactional imports, and a configurable cron worker (`GOODWILL_SYNC_CRON`). Similar hardening should be extended to Salvation Army and future sources (centralized observability, alerting).

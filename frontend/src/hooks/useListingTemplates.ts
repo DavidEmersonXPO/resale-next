@@ -7,6 +7,8 @@ export interface ListingTemplate {
   description?: string | null;
   vertical: string;
   defaultData: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export const useListingTemplates = () => {

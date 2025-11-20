@@ -4,6 +4,10 @@ import axios, { AxiosInstance, AxiosStatic } from 'axios';
 import { wrapper } from 'axios-cookiejar-support';
 import { CookieJar } from 'tough-cookie';
 import { load } from 'cheerio';
+import {
+  SalvationArmyAuthError,
+  SalvationArmyFetchError,
+} from './errors';
 
 interface WonItem {
   invoiceId: string;
@@ -32,32 +36,50 @@ export class SalvationArmyHttpService {
       loginPath: opts.loginPath ?? '/Account/LogOn',
       invoicesUrl: opts.invoicesUrl ?? '/Account/Invoices',
       wonUrl: opts.wonUrl ?? '/Account/Won',
-      listingBaseUrl: opts.listingBaseUrl ?? opts.baseUrl ?? 'https://www.shopthesalvationarmy.com',
+      listingBaseUrl:
+        opts.listingBaseUrl ??
+        opts.baseUrl ??
+        'https://www.shopthesalvationarmy.com',
     };
   }
 
   async fetchInvoices(username: string, password: string) {
     const client = await this.createAuthenticatedClient(username, password);
-    if (!client) return [];
 
-    const invoiceListHtml = await this.getHtml(client, this.options.invoicesUrl);
-    const invoiceLinks = this.parseInvoiceLinks(invoiceListHtml);
+    try {
+      const invoiceListHtml = await this.getHtml(
+        client,
+        this.options.invoicesUrl,
+      );
+      const invoiceLinks = this.parseInvoiceLinks(invoiceListHtml);
 
-    const wonHtml = await this.getHtml(client, this.options.wonUrl);
-    const wonItems = this.parseWonItems(wonHtml);
+      const wonHtml = await this.getHtml(client, this.options.wonUrl);
+      const wonItems = this.parseWonItems(wonHtml);
 
-    const invoices: { invoiceId: string; html: string }[] = [];
-    for (const invoice of invoiceLinks) {
-      const html = await this.getHtml(client, invoice.href);
-      invoices.push({ invoiceId: invoice.invoiceId, html });
+      const invoices: { invoiceId: string; html: string }[] = [];
+      for (const invoice of invoiceLinks) {
+        const html = await this.getHtml(client, invoice.href);
+        invoices.push({ invoiceId: invoice.invoiceId, html });
+      }
+
+      return { invoices, wonItems };
+    } catch (error) {
+      this.logger.error(
+        'Failed to fetch Salvation Army invoices',
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new SalvationArmyFetchError(
+        error instanceof Error ? error.message : 'Unknown fetch error',
+      );
     }
-
-    return { invoices, wonItems };
   }
 
-  private async createAuthenticatedClient(username: string, password: string): Promise<AxiosInstance | null> {
+  private async createAuthenticatedClient(
+    username: string,
+    password: string,
+  ): Promise<AxiosInstance> {
     const jar = new CookieJar();
-    const baseClient = axios as AxiosStatic;
+    const baseClient = axios;
     const wrapped = wrapper(baseClient);
     const client = wrapped.create({
       baseURL: this.options.baseUrl,
@@ -89,13 +111,19 @@ export class SalvationArmyHttpService {
       );
 
       if (response.status !== 302) {
-        this.logger.warn('Salvation Army login did not redirect; status {status}', response.status);
+        throw new SalvationArmyAuthError(
+          `Unexpected login status ${response.status}`,
+        );
       }
 
       return client;
     } catch (error) {
-      this.logger.error(`Salvation Army login failed: ${(error as Error).message}`);
-      return null;
+      this.logger.error(
+        `Salvation Army login failed: ${(error as Error).message}`,
+      );
+      throw new SalvationArmyAuthError(
+        error instanceof Error ? error.message : 'Unknown login error',
+      );
     }
   }
 
@@ -126,12 +154,22 @@ export class SalvationArmyHttpService {
       const listingId = $(el).attr('data-listing-id') ?? '';
       const listingUrl = $(el).find('a').attr('href') ?? '';
       const title = $(el).find('.item-title').text().trim();
-      const quantity = Number.parseInt($(el).find('.item-quantity').text().trim(), 10) || 1;
+      const quantity =
+        Number.parseInt($(el).find('.item-quantity').text().trim(), 10) || 1;
       const price =
-        Number.parseFloat($(el).find('.item-price').text().replace(/[$,]/g, '')) || 0;
+        Number.parseFloat(
+          $(el).find('.item-price').text().replace(/[$,]/g, ''),
+        ) || 0;
 
       if (invoiceId && listingId) {
-        items.push({ invoiceId, listingId, listingUrl, title, quantity, price });
+        items.push({
+          invoiceId,
+          listingId,
+          listingUrl,
+          title,
+          quantity,
+          price,
+        });
       }
     });
     return items;

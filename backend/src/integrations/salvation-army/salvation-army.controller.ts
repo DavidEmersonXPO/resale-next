@@ -3,7 +3,10 @@ import { ApiTags } from '@nestjs/swagger';
 import { SalvationArmyService } from './salvation-army.service';
 import { SalvationInvoiceDto } from './dto/salvation-invoice.dto';
 import { SalvationArmyCredentialService } from './salvation-army-credential.service';
-import { UpdateSalvationArmyCredentialDto, SalvationArmyCredentialResponseDto } from './dto/credential.dto';
+import {
+  UpdateSalvationArmyCredentialDto,
+  SalvationArmyCredentialResponseDto,
+} from './dto/credential.dto';
 
 @ApiTags('Integrations / Salvation Army')
 @Controller('integrations/salvation-army')

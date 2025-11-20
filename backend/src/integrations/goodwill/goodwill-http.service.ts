@@ -2,8 +2,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import { load } from 'cheerio';
-import { GoodwillCsvParser, GoodwillOrderRecord, GoodwillOrderStatus } from './goodwill-csv.parser';
+import {
+  GoodwillCsvParser,
+  GoodwillOrderRecord,
+  GoodwillOrderStatus,
+} from './goodwill-csv.parser';
 import { encryptToUrlSafeBase64 } from './shopgoodwill-crypto';
+import {
+  GoodwillAuthError,
+  GoodwillConfigurationError,
+  GoodwillDownloadError,
+} from './errors';
 
 export interface GoodwillOptions {
   baseUrl: string;
@@ -23,6 +32,7 @@ export interface GoodwillOptions {
   openOrdersCsvPath?: string;
   shippedOrdersCsvPath?: string;
   requestTimeoutSeconds: number;
+  maxRetries: number;
 }
 
 @Injectable()
@@ -51,39 +61,54 @@ export class GoodwillHttpService {
       openOrdersCsvPath: config.openOrdersCsvPath,
       shippedOrdersCsvPath: config.shippedOrdersCsvPath,
       requestTimeoutSeconds: config.requestTimeoutSeconds ?? 60,
+      maxRetries: config.requestMaxRetries ?? 3,
     };
   }
 
-  async fetchRemoteOrders(username: string, password: string): Promise<GoodwillOrderRecord[]> {
+  async fetchRemoteOrders(
+    username: string,
+    password: string,
+  ): Promise<GoodwillOrderRecord[]> {
     if (!this.options.openOrdersCsvPath && !this.options.shippedOrdersCsvPath) {
-      return [];
+      throw new GoodwillConfigurationError(
+        'Goodwill CSV paths are not configured.',
+      );
     }
 
     const client = await this.createAuthenticatedClient(username, password);
-    if (!client) {
-      return [];
-    }
 
     try {
       const records: GoodwillOrderRecord[] = [];
       if (this.options.openOrdersCsvPath) {
-        const csv = await this.downloadCsv(client, this.options.openOrdersCsvPath);
+        const csv = await this.executeWithRetry(
+          () => this.downloadCsv(client, this.options.openOrdersCsvPath!),
+          'open orders CSV',
+        );
         records.push(...this.parser.parse(csv, GoodwillOrderStatus.OPEN));
       }
       if (this.options.shippedOrdersCsvPath) {
-        const csv = await this.downloadCsv(client, this.options.shippedOrdersCsvPath);
+        const csv = await this.executeWithRetry(
+          () => this.downloadCsv(client, this.options.shippedOrdersCsvPath!),
+          'shipped orders CSV',
+        );
         records.push(...this.parser.parse(csv, GoodwillOrderStatus.SHIPPED));
       }
       return records;
+    } catch (error) {
+      throw new GoodwillDownloadError(
+        error instanceof Error ? error.message : 'Unknown download failure',
+      );
     } finally {
       client.defaults.headers.common.Authorization = undefined;
     }
   }
 
-  private async createAuthenticatedClient(username: string, password: string): Promise<AxiosInstance | null> {
+  private async createAuthenticatedClient(
+    username: string,
+    password: string,
+  ): Promise<AxiosInstance> {
     if (!this.options.loginPath) {
-      this.logger.warn('Goodwill login path not configured');
-      return null;
+      throw new GoodwillConfigurationError('Goodwill login path not configured');
     }
 
     const client = axios.create({
@@ -115,21 +140,29 @@ export class GoodwillHttpService {
       });
 
       if (response.status >= 400) {
-        this.logger.warn(`Goodwill login failed with status ${response.status}`);
-        return null;
+        throw new GoodwillAuthError(
+          `ShopGoodwill login failed with status ${response.status}`,
+        );
       }
 
-      const accessToken = response.data?.accessToken ?? response.data?.AccessToken;
+      const accessToken =
+        response.data?.accessToken ?? response.data?.AccessToken;
       if (!accessToken) {
-        this.logger.warn('Goodwill login did not return an access token');
-        return null;
+        throw new GoodwillAuthError(
+          'ShopGoodwill login did not return an access token',
+        );
       }
 
       client.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
       return client;
     } catch (error) {
-      this.logger.error('Goodwill login workflow failed', error instanceof Error ? error.stack : undefined);
-      return null;
+      this.logger.error(
+        'Goodwill login workflow failed',
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new GoodwillAuthError(
+        error instanceof Error ? error.message : 'Unknown login error',
+      );
     }
   }
 
@@ -153,12 +186,18 @@ export class GoodwillHttpService {
       });
       return hiddenInputs;
     } catch (error) {
-      this.logger.debug(`Failed to prefetch Goodwill login page: ${(error as Error).message}`);
+      this.logger.debug(
+        `Failed to prefetch Goodwill login page: ${(error as Error).message}`,
+      );
       return {};
     }
   }
 
-  private buildLoginPayload(username: string, password: string, hiddenFields: Record<string, string>) {
+  private buildLoginPayload(
+    username: string,
+    password: string,
+    hiddenFields: Record<string, string>,
+  ) {
     const encryptedUsername = this.options.loginEncryptionKey
       ? encryptToUrlSafeBase64(username, this.options.loginEncryptionKey)
       : username;
@@ -184,5 +223,35 @@ export class GoodwillHttpService {
   private async downloadCsv(client: AxiosInstance, path: string) {
     const response = await client.get(path, { responseType: 'text' });
     return response.data ?? '';
+  }
+
+  private async executeWithRetry<T>(
+    action: () => Promise<T>,
+    description: string,
+  ): Promise<T> {
+    let attempt = 0;
+    let lastError: unknown;
+    while (attempt < Math.max(1, this.options.maxRetries)) {
+      attempt += 1;
+      try {
+        return await action();
+      } catch (error) {
+        lastError = error;
+        this.logger.warn(
+          `Goodwill ${description} attempt ${attempt} failed: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`,
+        );
+        if (attempt >= this.options.maxRetries) {
+          break;
+        }
+        await new Promise((resolve) =>
+          setTimeout(resolve, attempt * 1000),
+        );
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new Error(`Failed to fetch ${description}`);
   }
 }
